@@ -253,4 +253,17 @@ mod tests {
         assert_eq!(been_dropped.get(), true);
         assert!(Weak::try_get(&weak).is_none());
     }
+
+    #[test]
+    fn spooky() {
+        let owner = Somr::new("Really bad news".to_owned());
+        let weak = Somr::to_weak(&owner);
+        let bad = {
+            let out = Weak::try_get(&weak).unwrap();
+            ::std::mem::drop(owner);
+            out
+        };
+
+        assert_eq!(bad, "Really bad news");
+    }
 }

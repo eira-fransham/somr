@@ -14,7 +14,8 @@ but it is significantly less than `Rc`.
 
 ### WARNING: THIS IS NOT PRODUCTION-READY
 
-This crate is something on the order of 300% unsafe code and it has not been
-audited by anyone other than me. I've had a bunch of segfaults in it that I have
-since fixed, but it's entirely possible that there are edge-cases that I haven't
-accounted for. Use at your own peril, or (even better) don't use at all.
+This is currently _super_ unsound when you drop the owner while still holding
+onto the reference returned by `Weak::try_get(...)`. I don't know how to fix
+this, but the majority of the point of this library is (in my opinion) removed
+if the allocation is maintained while there are still weak references. I have
+some ideas of how to fix this, but it's a bad problem.
