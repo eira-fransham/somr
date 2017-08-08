@@ -147,7 +147,8 @@ impl<T: ?Sized> Weak<T> {
         Self::try_get(this, |_| ()).is_none()
     }
 
-    pub fn try_get<Out, F: FnOnce(&T) -> Out>(this: &Self, func: F) -> Option<Out> {
+    // `Fn` so that we can't mutate or drop the owning reference by moving it into this function.
+    pub fn try_get<Out, F: Fn(&T) -> Out>(this: &Self, func: F) -> Option<Out> {
         unsafe {
             if !value_dropped(this.ptr.as_ptr()) {
                 let inner = &*this.ptr.as_ptr();
