@@ -133,7 +133,7 @@ impl<T: ?Sized> Somr<T> {
             );
 
             this.ptr.as_ref().weak_count.set(
-                flags | (new_count & COUNT_MASK)
+                flags | (new_count & COUNT_MASK),
             )
         };
 
@@ -142,11 +142,16 @@ impl<T: ?Sized> Somr<T> {
 }
 
 impl<T: ?Sized> Weak<T> {
-    pub fn try_get(this: &Self) -> Option<&T> {
+    // TODO: Does this need to be optimised?
+    pub fn is_dropped(this: &Self) -> bool {
+        Self::try_get(this, |_| ()).is_none()
+    }
+
+    pub fn try_get<Out, F: FnOnce(&T) -> Out>(this: &Self, func: F) -> Option<Out> {
         unsafe {
             if !value_dropped(this.ptr.as_ptr()) {
                 let inner = &*this.ptr.as_ptr();
-                Some(&inner.value)
+                Some(func(&inner.value))
             } else {
                 None
             }
@@ -178,8 +183,7 @@ impl<T: ?Sized> Drop for Somr<T> {
             let inner = &mut *self.ptr.as_ptr();
 
             inner.weak_count.set(
-                inner.weak_count.get() |
-                VALUE_DROPPED_FLAG,
+                inner.weak_count.get() | VALUE_DROPPED_FLAG,
             );
 
             ptr::drop_in_place(&mut inner.value);
@@ -193,7 +197,7 @@ impl<T: ?Sized> Drop for Somr<T> {
                 {
                     inner.weak_count.set(
                         inner.weak_count.get() |
-                        VALUE_DEALLOCATED_FLAG,
+                            VALUE_DEALLOCATED_FLAG,
                     )
                 }
             }
@@ -218,7 +222,10 @@ mod tests {
 
         let weak = Somr::to_weak(&somr);
 
-        assert_eq!(Weak::try_get(&weak).map(|a| a as &str), Some("Hello!"));
+        assert_eq!(
+            Weak::try_get(&weak, |a| a.to_owned()),
+            Some(format!("Hello!"))
+        );
     }
 
     #[test]
@@ -228,7 +235,7 @@ mod tests {
             Somr::to_weak(&owner)
         };
 
-        assert_eq!(Weak::try_get(&weak), None);
+        assert!(Weak::is_dropped(&weak));
     }
 
     #[test]
@@ -250,20 +257,7 @@ mod tests {
             Somr::to_weak(&owner)
         };
 
-        assert_eq!(been_dropped.get(), true);
-        assert!(Weak::try_get(&weak).is_none());
-    }
-
-    #[test]
-    fn spooky() {
-        let owner = Somr::new("Really bad news".to_owned());
-        let weak = Somr::to_weak(&owner);
-        let bad = {
-            let out = Weak::try_get(&weak).unwrap();
-            ::std::mem::drop(owner);
-            out
-        };
-
-        assert_eq!(bad, "Really bad news");
+        assert!(been_dropped.get());
+        assert!(Weak::is_dropped(&weak));
     }
 }
